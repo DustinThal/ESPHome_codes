@@ -1,0 +1,187 @@
+esphome:
+  name: esphome-sen55
+  friendly_name: esphome-sen55
+  platformio_options:
+    platform: https://github.com/lucaskatayama/platform-espressif32.git#feat/seeed_xiao_esp32c6.json
+    build_flags: "-DI2C_NUM_1=I2C_NUM_0"
+    #board_build.flash_mode: dio
+    #board_build.maximum_size: 1310720
+
+esp32:
+  board: seeed_xiao_esp32c6
+  variant: ESP32C6
+  partitions: partitions_zb.csv
+  framework:
+    type: esp-idf
+    version: 5.3.0
+    #platform_version: 6.9.0
+    sdkconfig_options:
+      #CONFIG_ESPTOOLPY_FLASHSIZE_4MB: y
+      #CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+      #CONFIG_BT_BLE_50_FEATURES_SUPPORTED: y
+      #CONFIG_BT_BLE_42_FEATURES_SUPPORTED: y
+      CONFIG_ESP_TASK_WDT: y
+      CONFIG_ESP_TASK_WDT_TIMEOUT_S: "10"
+      CONFIG_OPENTHREAD_ENABLED: n
+      CONFIG_ENABLE_WIFI_STATION: y
+      CONFIG_USE_MINIMAL_MDNS: y
+
+external_components:
+  - source: components
+    components: [zigbee]
+
+# Enable logging
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+#  level: VERY_VERBOSE
+
+#wifi:
+#  ssid: !secret wifi_ssid
+#  password: !secret wifi_password
+
+#ota:
+#  platform: esphome
+
+#web_server:
+#  port: 80
+
+i2c:
+  sda: GPIO22
+  scl: GPIO23
+  scan: false
+  id: bus_0x69
+
+sensor:
+  - platform: sen5x
+    id: SEN55
+    pm_1_0:
+      name: " PM <1µm Weight concentration"
+      id: air_pm_1_0
+    pm_2_5:
+      name: " PM <2.5µm Weight concentration"
+      id: air_pm_2_5
+    pm_4_0:
+      name: " PM <4µm Weight concentration"
+      id: air_pm_4_0
+    pm_10_0:
+      name: " PM <10µm Weight concentration"
+      id: air_pm_10_0
+    temperature:
+      name: "Temperature"
+      id: air_temperature
+    humidity:
+      name: "Humidity"
+      id: relative_humidity
+    voc:
+      name: "VOC"
+      id: air_voc
+      algorithm_tuning:
+        index_offset: 100
+        learning_time_offset_hours: 12
+        learning_time_gain_hours: 12
+        gating_max_duration_minutes: 180
+        std_initial: 50
+        gain_factor: 230
+    nox:
+      name: "NOX"
+      id: air_nox
+      algorithm_tuning:
+        index_offset: 1
+        learning_time_offset_hours: 12
+        learning_time_gain_hours: 12
+        gating_max_duration_minutes: 720
+        std_initial: 50
+        gain_factor: 230 
+    temperature_compensation:
+      offset: 0
+      normalized_offset_slope: 0
+      time_constant: 0
+    acceleration_mode: low
+    store_baseline: true
+    address: 0x69
+    update_interval: 10s
+
+
+zigbee:
+  id: "zb"
+  endpoints:
+    - device_type: TEMPERATURE_SENSOR
+      num: 1
+      clusters:
+        - id: TEMP_MEASUREMENT
+          attributes:
+            - attribute_id: 0x0
+              type: S16
+              report: true
+              value: 100
+              device: air_temperature
+              scale: 100
+        - id: REL_HUMIDITY_MEASUREMENT
+          attributes:
+            - attribute_id: 0x0
+              type: S16
+              report: true
+              scale: 100
+              device: relative_humidity
+
+    - device_type: CUSTOM_ATTR
+      num: 2
+      clusters:
+        - id: 0xFC2C
+          attributes:
+            - attribute_id: 0x0
+              type: U16
+              report: true
+              access: read_only
+              value: 0
+              scale: 100
+              device: air_pm_1_0
+        - id: 0xFC2D 
+          attributes:
+            - attribute_id: 0x0
+              type: U16
+              report: true
+              access: read_only
+              value: 0
+              scale: 100
+              device: air_pm_2_5
+        - id: 0xFC2E
+          attributes:
+            - attribute_id: 0x0
+              type: U16
+              report: true
+              access: read_only
+              value: 0
+              scale: 100
+              device: air_pm_4_0
+        - id: 0xFC2F
+          attributes:
+            - attribute_id: 0x0
+              type: U16
+              report: true
+              access: read_only
+              value: 0
+              scale: 100
+              device: air_pm_10_0
+        - id: 0xFC30
+          attributes:
+            - attribute_id: 0x0
+              type: U16
+              report: true
+              access: read_only
+              value: 0
+              scale: 100
+              device: air_voc
+        - id: 0xFC31
+          attributes:
+            - attribute_id: 0x0
+              type: U16
+              report: true
+              access: read_only
+              value: 0
+              scale: 100
+              device: air_nox
+
+  on_join:
+    then:
+      - logger.log: "Joined network"
